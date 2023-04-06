@@ -37,6 +37,8 @@ auth_mode_t auth_mode=auth_md5;
 cipher_mode_t cipher_mode=cipher_aes128cbc;
 int is_hmac_used=0;
 
+int aes128cfb_old=0;
+
 //TODO key negotiation and forward secrecy
 
 int my_init_keys(const char * user_passwd,int is_client)
@@ -53,7 +55,7 @@ int my_init_keys(const char * user_passwd,int is_client)
 
 	if(auth_mode==auth_hmac_sha1)
 		is_hmac_used=1;
-	if(is_hmac_used||g_fix_gro)
+	if(is_hmac_used||g_fix_gro||1)
 	{
 		unsigned char salt[400]="";
 		char salt_text[400]="udp2raw_salt1";
@@ -297,6 +299,40 @@ int de_padding(const char *data ,int &data_len,int padding_num)
 	}
 	return 0;
 }
+void aes_ecb_encrypt(const char *data,char *output)
+{
+	static int first_time=1;
+	char *key=(char*)cipher_key_encrypt;
+	if(aes_key_optimize)
+	{
+		if(first_time==0) key=0;
+		else first_time=0;
+	}	
+	AES_ECB_encrypt_buffer((uint8_t*)data,(uint8_t*)key,(uint8_t*)output);
+}
+void aes_ecb_encrypt1(char *data)
+{
+    char buf[16];
+    memcpy(buf,data,16);
+    aes_ecb_encrypt(buf,data);
+}
+void aes_ecb_decrypt(const char *data,char *output)
+{
+	static int first_time=1;
+	char *key=(char*)cipher_key_decrypt;
+	if(aes_key_optimize)
+	{
+		if(first_time==0) key=0;
+		else first_time=0;
+	}	
+	AES_ECB_decrypt_buffer((uint8_t*)data,(uint8_t*)key,(uint8_t*)output);
+}
+void aes_ecb_decrypt1(char *data)
+{
+    char buf[16];
+    memcpy(buf,data,16);
+    aes_ecb_decrypt(buf,data);
+}
 int cipher_aes128cbc_encrypt(const char *data,char *output,int &len,char * key)
 {
 	static int first_time=1;
@@ -318,6 +354,7 @@ int cipher_aes128cbc_encrypt(const char *data,char *output,int &len,char * key)
 int cipher_aes128cfb_encrypt(const char *data,char *output,int &len,char * key)
 {
 	static int first_time=1;
+	assert(len>=16);
 
 	char buf[buf_len];
 	memcpy(buf,data,len);//TODO inefficient code
@@ -325,6 +362,10 @@ int cipher_aes128cfb_encrypt(const char *data,char *output,int &len,char * key)
 	{
 		if(first_time==0) key=0;
 		else first_time=0;
+	}
+	if(!aes128cfb_old)
+	{
+	    aes_ecb_encrypt(data,buf); //encrypt the first block
 	}
 
 	AES_CFB_encrypt_buffer((unsigned char *)output,(unsigned char *)buf,len,(unsigned char *)key,(unsigned char *)zero_iv);
@@ -369,12 +410,19 @@ int cipher_aes128cbc_decrypt(const char *data,char *output,int &len,char * key)
 int cipher_aes128cfb_decrypt(const char *data,char *output,int &len,char * key)
 {
 	static int first_time=1;
+	if(len<16) return -1;
+    
 	if(aes_key_optimize)
 	{
 		if(first_time==0) key=0;
 		else first_time=0;
 	}
+	
+	
 	AES_CFB_decrypt_buffer((unsigned char *)output,(unsigned char *)data,len,(unsigned char *)key,(unsigned char *)zero_iv);
+	
+	if(!aes128cfb_old)
+	    aes_ecb_decrypt1(output); //decrypt the first block
 	//if(de_padding(output,len,16)<0) return -1;
 	return 0;
 }

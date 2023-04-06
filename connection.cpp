@@ -497,9 +497,16 @@ int send_safer(conn_info_t &conn_info,char type,const char* data,int len)  //saf
             return -1;
         }
         write_u16(send_data_buf2,new_len);
-        send_data_buf2[0]^=gro_xor[0];
-        send_data_buf2[1]^=gro_xor[1];
         new_len+=2;
+	if(cipher_mode==cipher_xor)
+	{
+	    send_data_buf2[0]^=gro_xor[0];
+	    send_data_buf2[1]^=gro_xor[1];
+	}
+	else if(cipher_mode==cipher_aes128cbc||cipher_mode==cipher_aes128cbc)
+	{
+	    aes_ecb_encrypt1(send_data_buf2);
+	}
     }
 
 
@@ -656,14 +663,21 @@ int recv_safer_multi(conn_info_t &conn_info,vector<char> &type_arr,vector<string
         int ori_recv_len=recv_len;
         //mylog(log_debug,"recv_len:%d\n",recv_len);
         int cnt=0;
-        while(recv_len>2)
+        while(recv_len>=16)
         {
             cnt++;
             int single_len_no_xor;
             single_len_no_xor=read_u16(recv_data);
             int single_len;
-            recv_data[0]^=gro_xor[0];
-            recv_data[1]^=gro_xor[1];
+	    if(cipher_mode==cipher_xor)
+	    {
+		recv_data[0]^=gro_xor[0];
+		recv_data[1]^=gro_xor[1];
+	    }
+	    else if(cipher_mode==cipher_aes128cbc||cipher_mode==cipher_aes128cbc)
+	    {
+		aes_ecb_decrypt1(recv_data);
+	    }
             single_len=read_u16(recv_data);
             recv_len-=2;
             recv_data+=2;
@@ -672,9 +686,10 @@ int recv_safer_multi(conn_info_t &conn_info,vector<char> &type_arr,vector<string
                 mylog(log_debug,"illegal single_len %d(%d), recv_len %d left,dropped\n",single_len,single_len_no_xor,recv_len);
                 break;
             }
-            if(single_len> single_max_data_len )
+            if(single_len> max_data_len )
             {
-                mylog(log_warn,"single_len %d(%d) > %d, maybe you need to turn down mtu at upper level\n",single_len,single_len_no_xor,single_max_data_len);
+                mylog(log_warn,"single_len %d(%d) > %d, maybe you need to turn down mtu at upper level\n",single_len,single_len_no_xor,max_data_len);
+		break;
             }
 
             int ret = reserved_parse_safer(conn_info, recv_data, single_len, type, data, len);

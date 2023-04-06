@@ -12,6 +12,7 @@
 //extern char key[16];
 
 const int aes_key_optimize=1; //if enabled,once you used a key for aes,you cant change it anymore
+extern int aes128cfb_old;
 
 int my_init_keys(const char *,int);
 
@@ -38,5 +39,11 @@ extern char gro_xor[256+100];
 
 int cipher_decrypt(const char *data,char *output,int &len,char * key);//internal interface ,exposed for test only
 int cipher_encrypt(const char *data,char *output,int &len,char * key);//internal interface ,exposed for test only
+
+void aes_ecb_encrypt(const char *data,char *output);
+void aes_ecb_decrypt(const char *data,char *output);
+
+void aes_ecb_encrypt1(char *data);
+void aes_ecb_decrypt1(char *data);
 
 #endif
