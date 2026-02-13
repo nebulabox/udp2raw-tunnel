@@ -1,42 +1,44 @@
 # Udp2raw-tunnel
 
 
-A Tunnel which turns UDP Traffic into Encrypted FakeTCP/UDP/ICMP Traffic by using Raw Socket, helps you Bypass UDP FireWalls(or Unstable UDP Environment). It can defend Replay-Attack and supports Multiplexing. It also acts as a Connection Stabilizer.
-
-![image0](images/image0.PNG)
+A Tunnel which turns UDP Traffic into Encrypted FakeTCP/UDP/ICMP Traffic by using Raw Socket, helps you Bypass UDP FireWalls(or Unstable UDP Environment).
 
 When used alone,udp2raw tunnels only UDP traffic. Nevertheless,if you used udp2raw + any UDP-based VPN together,you can tunnel any traffic(include TCP/UDP/ICMP),currently OpenVPN/L2TP/ShadowVPN and [tinyfecVPN](https://github.com/wangyu-/tinyfecVPN) are confirmed to be supported.
 
-![image_vpn](images/udp2rawopenvpn.PNG)
 
-[简体中文](/doc/README.zh-cn.md)(内容更丰富)
+![image0](images/image0.PNG)
+
+or
+
+![image_vpn](images/udp2rawopenvpn.PNG)
 
 [udp2raw wiki](https://github.com/wangyu-/udp2raw-tunnel/wiki)
 
+[简体中文](/doc/README.zh-cn.md)
+
+
 # Support Platforms
-Linux host (including desktop Linux,Android phone/tablet,OpenWRT router,or Raspberry PI) with root access.
+Linux host (including desktop Linux,Android phone/tablet,OpenWRT router,or Raspberry PI) with root account or cap_net_raw capability.
 
 For Windows and MacOS users, use the udp2raw in [this repo](https://github.com/wangyu-/udp2raw-multiplatform).
-
-<del>For Windows and MacOS You can run udp2raw inside [this](https://github.com/wangyu-/udp2raw-tunnel/releases/download/20171108.0/lede-17.01.2-x86_virtual_machine_image.zip) 7.5mb virtual machine image(make sure network adapter runs at bridged mode).</del>
-
-
 
 # Features
 ### Send/Receive UDP Packets with ICMP/FakeTCP/UDP headers
 ICMP/FakeTCP headers help you bypass UDP blocking, UDP QOS or improper UDP NAT behavior on some ISPs. In ICMP header mode,udp2raw works like an ICMP tunnel.
 
-UDP headers are also supported. In UDP header mode, it behaves just like a normal UDP tunnel, and you can just make use of the other features (such as encryption, anti-replay, or connection stalization).
+UDP headers are also supported. In UDP header mode, it behaves just like a normal UDP tunnel, and you can just make use of the other features (such as encryption, anti-replay, or connection stabilization).
 
 ### Simulated TCP with Real-time/Out-of-Order Delivery
-In FakeTCP header mode,udp2raw simulates 3-way handshake while establishing a connection,simulates seq and ack_seq while data transferring. It also simulates following TCP options: `MSS`, `sackOk`, `TS`, `TS_ack`, `wscale`.Firewalls will regard FakeTCP as a TCP connection, but its essentially UDP: it supports real-time/out-of-order delivery(just as normal UDP does), no congestion control or re-transmission. So there wont be any TCP over TCP problem when using OpenVPN.
+In FakeTCP header mode,udp2raw simulates 3-way handshake while establishing a connection,simulates seq and ack_seq while data transferring. It also simulates a few TCP options such as: `MSS`, `sackOk`, `TS`, `TS_ack`, `wscale`. Firewalls will regard FakeTCP as a TCP connection, but its essentially UDP: it supports real-time/out-of-order delivery(just as normal UDP does), no congestion control or re-transmission. So there wont be any TCP over TCP problem when using OpenVPN.
 
 ### Encryption, Anti-Replay
 * Encrypt your traffic with AES-128-CBC.
 * Protect data integrity by HMAC-SHA1 (or weaker MD5/CRC32).
-* Defense replay attack with an anti-replay window, smiliar to IPSec and OpenVPN.
+* Defense replay attack with anti-replay window.
 
-### Failure Dectection & Stablization (Connection Recovery)
+[Notes on encryption](https://github.com/wangyu-/udp2raw-tunnel/wiki/Notes-on-encryption)
+
+### Failure Dectection & Stabilization (Connection Recovery)
 Conection failures are detected by heartbeats. If timed-out, client will automatically change port number and reconnect. If reconnection is successful, the previous connection will be recovered, and all existing UDP conversations will stay vaild.
 
 For example, if you use udp2raw + OpenVPN, OpenVPN won't lose connection after any reconnect, **even if network cable is re-plugged or WiFi access point is changed**.
@@ -79,16 +81,16 @@ Assume your UDP is blocked or being QOS-ed or just poorly supported. Assume your
 Now,an encrypted raw tunnel has been established between client and server through TCP port 4096. Connecting to UDP port 3333 at the client side is equivalent to connecting to port 7777 at the server side. No UDP traffic will be exposed.
 
 ### Note
-To run on Android, check [Android_Guide](/doc/android_guide.md)
+To run on Android, check [Android_Guide](https://github.com/wangyu-/udp2raw/wiki/Android-Guide)
 
-`-a` option automatically adds an iptables rule (or a few iptables rules) for you, udp2raw relys on this iptables rule to work stably. Be aware you dont forget `-a` (its a common mistake). If you dont want udp2raw to add iptables rule automatically, you can add it manually(take a look at `-g` option) and omit `-a`.
+`-a` option automatically adds an iptables rule (or a few iptables rules) for you, udp2raw relies on this iptables rule to work stably. Be aware you dont forget `-a` (its a common mistake). If you dont want udp2raw to add iptables rule automatically, you can add it manually(take a look at `-g` option) and omit `-a`.
 
 
 # Advanced Topic
 ### Usage
 ```
 udp2raw-tunnel
-git version:6e1df4b39f    build date:Oct 24 2017 09:21:15
+git version:4623f878e0    build date:Nov  3 2024 23:15:46
 repository: https://github.com/wangyu-/udp2raw-tunnel
 
 usage:
@@ -96,14 +98,16 @@ usage:
     run as server : ./this_program -s -l server_listen_ip:server_port -r remote_address:remote_port  [options]
 
 common options,these options must be same on both side:
-    --raw-mode            <string>        avaliable values:faketcp(default),udp,icmp
+    --raw-mode            <string>        available values:faketcp(default),udp,icmp and easy-faketcp
     -k,--key              <string>        password to gen symetric key,default:"secret key"
-    --cipher-mode         <string>        avaliable values:aes128cbc(default),xor,none
-    --auth-mode           <string>        avaliable values:hmac_sha1,md5(default),crc32,simple,none
+    --cipher-mode         <string>        available values:aes128cfb,aes128cbc(default),xor,none
+    --auth-mode           <string>        available values:hmac_sha1,md5(default),crc32,simple,none
     -a,--auto-rule                        auto add (and delete) iptables rule
     -g,--gen-rule                         generate iptables rule then exit,so that you can copy and
                                           add it manually.overrides -a
     --disable-anti-replay                 disable anti-replay,not suggested
+    --fix-gro                             try to fix huge packet caused by GRO. this option is at an early stage.
+                                          make sure client and server are at same version.
 client options:
     --source-ip           <ip>            force source-ip for raw socket
     --source-port         <port>          force source-port for raw socket,tcp/udp only
@@ -119,6 +123,7 @@ other options:
     --disable-color                       disable log color
     --disable-bpf                         disable the kernel space filter,most time its not necessary
                                           unless you suspect there is a bug
+    --dev                 <string>        bind raw socket to a device, not necessary but improves performance
     --sock-buf            <number>        buf size for socket,>=10 and <=10240,unit:kbyte,default:1024
     --force-sock-buf                      bypass system limitation while setting sock-buf
     --seq-mode            <number>        seq increase mode for faketcp:
@@ -131,11 +136,14 @@ other options:
     --lower-level         <string>        send packets at OSI level 2, format:'if_name#dest_mac_adress'
                                           ie:'eth0#00:23:45:67:89:b9'.or try '--lower-level auto' to obtain
                                           the parameter automatically,specify it manually if 'auto' failed
+    --wait-lock                           wait for xtables lock while invoking iptables, need iptables v1.4.20+
     --gen-add                             generate iptables rule and add it permanently,then exit.overrides -g
     --keep-rule                           monitor iptables and auto re-add if necessary.implys -a
+    --hb-len              <number>        length of heart-beat packet, >=0 and <=1500
+    --mtu-warn            <number>        mtu warning threshold, unit:byte, default:1375
     --clear                               clear any iptables rules added by this program.overrides everything
+    --retry-on-error                      retry on error, allow to start udp2raw before network is initialized
     -h,--help                             print this help message
-
 ```
 
 ### Iptables rules,`-a` and `-g`
@@ -217,63 +225,6 @@ raw_mode: faketcp  cipher_mode: aes128cbc  auth_mode: md5
 ![image5](images/image5.PNG)
 
 (reverse speed was simliar and not uploaded)
-
-# Application
-## Tunneling any traffic via raw traffic by using udp2raw +openvpn
-![image_vpn](images/udp2rawopenvpn.PNG)
-1. Bypasses UDP block/UDP QOS
-
-2. No TCP over TCP problem (TCP over TCP problem http://sites.inka.de/bigred/devel/tcp-tcp.html ,https://community.openvpn.net/openvpn/ticket/2 )
-
-3. OpenVpn over ICMP also becomes a choice
-
-4. Supports almost any UDP-based VPN
-
-More details at [openvpn+udp2raw_guide](https://github.com/wangyu-/udp2raw-tunnel/wiki/udp2raw-openvpn-config-guide)
-## Speed-up tcp connection via raw traffic by using udp2raw+kcptun
-kcptun is a tcp connection speed-up program,it speeds-up tcp connection by using kcp protocol on-top of udp.by using udp2raw,you can use kcptun while udp is QoSed or blocked.
-(kcptun, https://github.com/xtaci/kcptun)
-
-## Speed-up tcp connection via raw traffic by using udp2raw+finalspeed
-finalspeed is a tcp connection speed-up program similiar to kcptun,it speeds-up tcp connection by using kcp protocol on-top of udp or tcp.but its tcp mode doesnt support openvz,you can bypass this problem if you use udp2raw+finalspeed together,and icmp mode also becomes avaliable.
-
-# How to build
-read [build_guide](/doc/build_guide.md)
-
-# Other
-### Easier installation on ArchLinux
-```
-yaourt -S udp2raw-tunnel # or
-pacaur -S udp2raw-tunnel
-```
-
-# Related work
-### kcptun-raw
-udp2raw was inspired by kcptun-raw,which modified kcptun to support tcp mode.
-
-https://github.com/Chion82/kcptun-raw
-### relayRawSocket
-kcptun-raw was inspired by relayRawSocket. A simple  udp to raw tunnel,wrote in python
-
-https://github.com/linhua55/some_kcptun_tools/tree/master/relayRawSocket
-### kcpraw
-another project of kcptun with tcp mode
-
-https://github.com/ccsexyz/kcpraw
-
-### icmptunnel
-Transparently tunnel your IP traffic through ICMP echo and reply packets.
-
-https://github.com/DhavalKapil/icmptunnel
-
-### Tcp Minion
-Tcp Minion is a project which modifid the code of tcp stack in kernel,and implemented real-time out-order udp packet delivery through this modified tcp stack.I failed to find the implementation,but there are some papers avaliable:
-
-https://arxiv.org/abs/1103.0463
-
-http://korz.cs.yale.edu/2009/tng/papers/pfldnet10.pdf
-
-https://pdfs.semanticscholar.org/9e6f/e2306f4385b4eb5416d1fcab16e9361d6ba3.pdf
 
 # wiki
 
